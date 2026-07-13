@@ -134,7 +134,79 @@ def main():
     plt.setp(ax.get_xticklabels(), rotation=45)
     ps.save(fig, "bt_excess_year.png")
 
+    ic_analysis(p)
     print("\nStep 7 done.")
+
+
+def ic_analysis(p):
+    """連續『土洋分歧』訊號的橫斷面 IC / ICIR 分析。
+    訊號 = 月內 z(投信買超比率) - z(外資買超比率); 高=投信積極/外資保守。"""
+    def zc(s):
+        sd = s.std()
+        return (s - s.mean()) / sd if sd and sd == sd else s * np.nan
+    p = p.copy()
+    p["sig"] = (p.groupby("ymp")["trust_net_ratio"].transform(zc)
+                - p.groupby("ymp")["foreign_net_ratio"].transform(zc))
+
+    def ic_series(df, ret, method="spearman", minn=15):
+        d = df.dropna(subset=["sig", ret])
+        return (d.groupby("ymp")
+                .apply(lambda g: g["sig"].corr(g[ret], method=method)
+                       if len(g) >= minn else np.nan, include_groups=False)
+                .dropna())
+
+    universes = {"大型": p[p.mcap_tier == "大型"], "全市場": p}
+    rows, ts = [], {}
+    for uname, udf in universes.items():
+        for h in C.FWD_HORIZONS:
+            ic = ic_series(udf, f"fwd_ret_{h}m")
+            n, m, sd = len(ic), ic.mean(), ic.std()
+            ir = m / sd if sd else np.nan
+            rows.append(dict(母體=uname, horizon=f"{h}m", n月=n,
+                             IC平均=m, IC標準差=sd, ICIR年化=ir * np.sqrt(12),
+                             IC_t=m / sd * np.sqrt(n) if sd else np.nan,
+                             IC為正比例=(ic > 0).mean()))
+            if uname == "大型" and h == 1:
+                ts["大型_rankIC_1m"] = ic
+    ic_tbl = pd.DataFrame(rows)
+    show = ic_tbl.copy()
+    for c in ["IC平均", "IC標準差"]:
+        show[c] = show[c].round(4)
+    for c in ["ICIR年化", "IC_t"]:
+        show[c] = show[c].round(2)
+    show["IC為正比例"] = (show["IC為正比例"] * 100).round(1)
+    show.to_csv(C.TAB / "bt_ic_summary.csv", encoding="utf-8-sig", index=False)
+    print("  tab -> bt_ic_summary.csv")
+    print("\n=== IC / ICIR (Spearman rank IC) ===")
+    print(show.to_string(index=False))
+
+    icm = ts["大型_rankIC_1m"]
+    icm.index = icm.index.to_timestamp()
+    icm.rename("rankIC").to_csv(C.TAB / "bt_ic_timeseries.csv", encoding="utf-8-sig")
+
+    # ---- 圖 3: IC 時序 (大型, 1m) + 12M 滾動平均 + 累積 IC ----
+    fig, ax = plt.subplots(figsize=(13, 6.5))
+    ax.bar(icm.index, icm.values, width=20, color="#9ecae1", label="月 rank IC")
+    ax.plot(icm.index, icm.rolling(12).mean(), color="#08519c", lw=2.2,
+            label="12M 滾動 IC")
+    ax.axhline(icm.mean(), color="#d95f0e", ls="--", lw=1.4,
+               label=f"平均 IC={icm.mean():.3f}")
+    ax.axhline(0, color="k", lw=.7)
+    ax2 = ax.twinx()
+    ax2.plot(icm.index, icm.cumsum(), color="#238b45", lw=1.6, alpha=.7,
+             label="累積 IC (右軸)")
+    ax2.set_ylabel("累積 IC", color="#238b45")
+    ax.set(title="土洋分歧訊號 橫斷面 rank IC (大型, 持有1M)", xlabel="", ylabel="月 IC")
+    ax.legend(loc="upper left")
+    ps.save(fig, "bt_ic_timeseries.png")
+
+    # ---- 圖 4: IC by horizon (大型 vs 全市場) ----
+    fig, ax = plt.subplots(figsize=(10, 6))
+    import seaborn as sns
+    sns.barplot(data=ic_tbl, x="horizon", y="IC平均", hue="母體", ax=ax)
+    ax.axhline(0, color="k", lw=.8)
+    ax.set(title="平均 rank IC by 持有期間", xlabel="持有期間", ylabel="平均 IC")
+    ps.save(fig, "bt_ic_horizon.png")
 
 
 if __name__ == "__main__":
