@@ -1,0 +1,10 @@
+# TEJ 授權資料 — 不上傳 (可由 src/00_ingest.py 重建), 避免違反授權與 repo 肥大
+data/raw/
+data/parquet/
+data/*.parquet
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
