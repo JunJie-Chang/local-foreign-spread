@@ -78,11 +78,11 @@ def main():
 
     # ---- 績效表 ----
     rows = {
-        "多方跟投信 L (vs 大型大盤)": perf(bt["L"], bt["bench_big"]),
-        "多空 LS (vs 大型大盤)": perf(bt["LS"], bt["bench_big"]),
-        "多方 L (vs 全市場)": perf(bt["L"], bt["bench_all"]),
-        "大型大盤 bench_big": perf(bt["bench_big"]),
-        "全市場 bench_all": perf(bt["bench_all"]),
+        "多方 L（相對大型指數）": perf(bt["L"], bt["bench_big"]),
+        "多空 L−S（相對大型指數）": perf(bt["LS"], bt["bench_big"]),
+        "多方 L（相對全市場）": perf(bt["L"], bt["bench_all"]),
+        "大型股市值加權指數": perf(bt["bench_big"]),
+        "全市場市值加權指數": perf(bt["bench_all"]),
     }
     tbl = pd.DataFrame(rows).T
     show = tbl.copy()
@@ -114,13 +114,13 @@ def main():
     # ---- 圖 1: 累積淨值 ----
     idx = bt.index.to_timestamp()
     fig, ax = plt.subplots(figsize=(13, 6.5))
-    for col, lab, c in [("L", "跟投信做多(大型洋賣土買)", "#2c7fb8"),
-                        ("bench_big", "大型股市值加權大盤", "#7f7f7f"),
-                        ("LS", "多空 L-S", "#d95f0e")]:
+    for col, lab, c in [("L", "多方 L（洋賣土買）", "#2c7fb8"),
+                        ("bench_big", "大型股市值加權指數", "#7f7f7f"),
+                        ("LS", "多空 L−S", "#d95f0e")]:
         nav = (1 + bt[col].fillna(0)).cumprod()
         ax.plot(idx, nav, label=lab, lw=2, color=c)
-    ax.set(title="策略累積淨值 (2010–2025, 等權月換股, 未計成本)",
-           xlabel="", ylabel="累積淨值 (起始=1)")
+    ax.set(title="策略累積淨值（2010–2025，等權月頻換股，未計交易成本）",
+           xlabel="", ylabel="累積淨值（起始＝1）")
     ax.legend()
     ps.save(fig, "bt_nav.png")
 
@@ -129,7 +129,7 @@ def main():
     colors = ["#2c7fb8" if v > 0 else "#d95f0e" for v in yr.values]
     ax.bar(yr.index.astype(str), yr.values, color=colors)
     ax.axhline(0, color="k", lw=.8)
-    ax.set(title="跟投信做多『相對大型大盤』逐年超額報酬 (%)",
+    ax.set(title="多方 L 相對大型股指數之逐年超額報酬 (%)",
            xlabel="", ylabel="超額報酬 %")
     plt.setp(ax.get_xticklabels(), rotation=45)
     ps.save(fig, "bt_excess_year.png")

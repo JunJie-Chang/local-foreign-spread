@@ -3,8 +3,8 @@ Step 4 — 後續報酬事件研究 (誰對誰錯) + seaborn 圖
 
 對作月之後 1/3/6/12M 還原報酬:
   - 依方向分組 (洋買土賣 / 洋賣土買), 對照 同買/同賣/無動作。
-  - 「跟外資」報酬 = foreign_side * fwd_ret (外資買->做多, 外資賣->做空);
-     >0 表示站在外資這邊會賺 = 外資對; <0 = 投信對。
+  - 「與外資同向」報酬 = foreign_side * fwd_ret (外資買->做多, 外資賣->做空);
+     >0 表示站在外資這邊會賺 = 外資方向正確; <0 = 投信方向正確。
   - 統計: n / 平均 / 中位數 / 勝率 / t 檢定; 分市值層與年度穩健性。
 輸出: outputs/figures/event_*.png, outputs/tables/event_*.csv
 """
@@ -43,7 +43,7 @@ def main():
     p = pd.read_parquet(C.SIGNALS)
     p["ymp"] = pd.PeriodIndex(p["ym"], freq="M")
 
-    # 「跟外資」報酬 (僅對作列有意義)
+    # 「與外資同向」報酬 (僅對作列有意義)
     opp = p[p["opp_flow"]].copy()
 
     # ===== 1) 各組 forward 報酬統計表 (含對照組) =====
@@ -64,7 +64,7 @@ def main():
     print(tbl.assign(mean=(tbl["mean"]*100).round(2), hit=(tbl["hit"]*100).round(1))
           .pivot(index="group", columns="horizon", values="mean").to_string())
 
-    # ===== 2) 誰對誰錯: 跟外資報酬 (整體 + 分市值層) =====
+    # ===== 2) 誰對誰錯: 與外資同向報酬 (整體 + 分市值層) =====
     rows = []
     for h in HZ:
         opp[f"foll_F_{h}m"] = opp["foreign_side"] * opp[f"fwd_ret_{h}m"]
@@ -74,7 +74,7 @@ def main():
             r["horizon"] = f"{h}m"; rows.append(r)
     follow = pd.DataFrame(rows)[["horizon", "group", "n", "mean", "median", "hit", "t", "p"]]
     save_tab(follow, "event_follow_foreign.csv")
-    print("\n跟外資報酬 (>0=外資對, 平均 %):")
+    print("\n與外資同向報酬 (>0=外資方向正確, 平均 %):")
     print(follow.assign(mean=(follow["mean"]*100).round(2))
           .pivot(index="group", columns="horizon", values="mean").to_string())
 
@@ -90,15 +90,15 @@ def main():
     ax.legend(title="", ncol=3)
     ps.save(fig, "event_group_returns.png")
 
-    # ===== 圖 B: 誰對誰錯 (跟外資報酬, 分市值層) =====
+    # ===== 圖 B: 誰對誰錯 (與外資同向報酬, 分市值層) =====
     fm = follow[follow.group != "全部對作"].copy()
-    fm["跟外資報酬%"] = fm["mean"] * 100
+    fm["與外資同向報酬%"] = fm["mean"] * 100
     fig, ax = plt.subplots(figsize=(12, 6))
-    sns.barplot(data=fm, x="horizon", y="跟外資報酬%", hue="group",
+    sns.barplot(data=fm, x="horizon", y="與外資同向報酬%", hue="group",
                 hue_order=C.MCAP_TIER_LABELS, ax=ax)
     ax.axhline(0, color="k", lw=.8)
-    ax.set(title="站在外資一方的後續報酬 (>0 外資對 / <0 投信對)",
-           xlabel="持有期間", ylabel="跟外資報酬 %")
+    ax.set(title="與外資同向之後續報酬（正值：外資方向正確；負值：投信方向正確）",
+           xlabel="持有期間", ylabel="與外資同向報酬 %")
     ax.legend(title="市值層")
     ps.save(fig, "event_who_is_right.png")
 
@@ -114,7 +114,7 @@ def main():
     ax.set(title="3 個月後還原報酬分布 (截尾 ±50%)", xlabel="", ylabel="報酬 %")
     ps.save(fig, "event_dist_3m.png")
 
-    # ===== 圖 D: 年度 × horizon 跟外資報酬 heatmap (時期穩健性) =====
+    # ===== 圖 D: 年度 × horizon 與外資同向報酬 heatmap (時期穩健性) =====
     yr_rows = []
     for h in HZ:
         col = f"foll_F_{h}m"
@@ -124,8 +124,8 @@ def main():
     save_tab(yr.reset_index(), "event_follow_by_year.csv")
     fig, ax = plt.subplots(figsize=(9, 11))
     sns.heatmap(yr, annot=True, fmt=".1f", center=0, cmap="RdBu_r",
-                cbar_kws={"label": "跟外資報酬 %"}, ax=ax)
-    ax.set(title="逐年『跟外資』報酬 (%)", xlabel="持有期間", ylabel="")
+                cbar_kws={"label": "與外資同向報酬 %"}, ax=ax)
+    ax.set(title="逐年『與外資同向』報酬 (%)", xlabel="持有期間", ylabel="")
     ps.save(fig, "event_year_heatmap.png")
 
     print("\nStep 4 done.")

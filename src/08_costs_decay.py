@@ -4,7 +4,7 @@ Step 8 — 可執行性檢驗：交易成本 + 訊號衰退歸因
 A. 成本/換股頻率敏感度：對 L / LS 策略計算實際週轉率, 扣不同來回成本 (0.3/0.45/0.6%),
    比較月頻 vs 季頻換股後的淨年化報酬、淨 alpha。
 B. 分期衰退：把 2010-2019 / 2020-2023 / 2024-2025 三段的 大型股 rank IC 與 L-S 淨值分開看。
-C. 2024-2025 反轉歸因：哪些產業/個股讓訊號翻車 (外資變對)。
+C. 2024-2025 反轉歸因：哪些產業/個股讓訊號反轉 (外資方向轉為正確)。
 輸出: outputs/figures/cd_*.png, outputs/tables/cd_*.csv
 """
 import sys
@@ -107,16 +107,17 @@ def main():
     # 圖: 淨值 gross vs 0.45% 成本 (月頻 vs 季頻 LS)
     fig, ax = plt.subplots(figsize=(13, 6.5))
     for series, T1, T2, per, lab, c, ls in [
-        (LSm, LmT, SmT, 12, "月頻 LS 毛", "#2c7fb8", "-"),
-        (LSm, LmT, SmT, 12, "月頻 LS 淨(0.45%)", "#2c7fb8", "--"),
-        (LSq, LqT, SqT, 4, "季頻 LS 毛", "#d95f0e", "-"),
-        (LSq, LqT, SqT, 4, "季頻 LS 淨(0.45%)", "#d95f0e", "--")]:
+        (LSm, LmT, SmT, 12, "月頻 L−S 毛報酬", "#2c7fb8", "-"),
+        (LSm, LmT, SmT, 12, "月頻 L−S 淨報酬(扣0.45%)", "#2c7fb8", "--"),
+        (LSq, LqT, SqT, 4, "季頻 L−S 毛報酬", "#d95f0e", "-"),
+        (LSq, LqT, SqT, 4, "季頻 L−S 淨報酬(扣0.45%)", "#d95f0e", "--")]:
         cc = 0.0045 if "淨" in lab else 0.0
         net = series - cc * (T1.reindex(series.index).fillna(0)
                              + T2.reindex(series.index).fillna(0))
         nav = (1 + net.fillna(0)).cumprod()
         ax.plot(net.index.to_timestamp(), nav, label=lab, color=c, ls=ls, lw=2)
-    ax.set(title="多空 LS 淨值：毛 vs 扣 0.45% 來回成本", xlabel="", ylabel="累積淨值")
+    ax.set(title="多空 L−S 累積淨值：毛報酬 vs 扣除 0.45% 來回成本",
+           xlabel="", ylabel="累積淨值")
     ax.legend()
     ps.save(fig, "cd_cost_nav.png")
 
@@ -149,14 +150,14 @@ def main():
     rec["follF"] = rec["foreign_side"] * rec["fwd_ret_12m"]
     rec = rec.dropna(subset=["follF"])
     rec["ind"] = short_ind(rec["tse_industry"])
-    print(f"\n=== C. 2024-2025 大型股對作 n={len(rec)}, 平均跟外資12M={rec['follF'].mean():.2%} "
-          f"(>0 表示外資已變對) ===")
+    print(f"\n=== C. 2024-2025 大型股對作 n={len(rec)}, 平均與外資同向12M={rec['follF'].mean():.2%} "
+          f"(>0 表示外資方向已轉為正確) ===")
     gi = rec.groupby("ind")["follF"]
-    ind = pd.DataFrame({"n": gi.size(), "平均跟外資12M": gi.mean()})
-    ind = ind[ind["n"] >= 15].sort_values("平均跟外資12M", ascending=False)
+    ind = pd.DataFrame({"n": gi.size(), "平均與外資同向12M": gi.mean()})
+    ind = ind[ind["n"] >= 15].sort_values("平均與外資同向12M", ascending=False)
     ind.to_csv(C.TAB / "cd_2024_industry.csv", encoding="utf-8-sig")
-    print("外資變最對(訊號翻車最兇)的產業:")
-    print(ind.assign(平均跟外資12M=(ind["平均跟外資12M"]*100).round(1)).head(8).to_string())
+    print("外資方向轉為正確幅度最大之產業:")
+    print(ind.assign(平均與外資同向12M=(ind["平均與外資同向12M"]*100).round(1)).head(8).to_string())
 
     # 方向拆解: 是多腿(洋賣土買)壞了還是空腿(洋買土賣)?
     dirn = (rec.groupby(rec["foreign_side"].map({1: "洋買土賣(空腿)", -1: "洋賣土買(多腿)"}))
@@ -168,11 +169,11 @@ def main():
 
     fig, ax = plt.subplots(figsize=(11, 8))
     it = ind.reset_index()
-    colors = ["#d95f0e" if v > 0 else "#2c7fb8" for v in it["平均跟外資12M"]]
-    ax.barh(it["ind"], it["平均跟外資12M"] * 100, color=colors)
+    colors = ["#d95f0e" if v > 0 else "#2c7fb8" for v in it["平均與外資同向12M"]]
+    ax.barh(it["ind"], it["平均與外資同向12M"] * 100, color=colors)
     ax.invert_yaxis(); ax.axvline(0, color="k", lw=.8)
-    ax.set(title="2024–2025 大型股各產業『跟外資』12M 報酬\n(橘>0=外資變對, 訊號翻車)",
-           xlabel="跟外資報酬 %", ylabel="")
+    ax.set(title="2024–2025 大型股各產業與外資同向報酬（12M）\n（橘色>0：外資方向轉為正確，訊號反轉）",
+           xlabel="與外資同向報酬 %", ylabel="")
     ps.save(fig, "cd_2024_industry.png")
 
     print("\nStep 8 done.")
